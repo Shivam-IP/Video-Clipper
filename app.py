@@ -7,7 +7,11 @@ import time
 from google import genai
 from pydantic import BaseModel
 
+# --- Configuration ---
 API_KEY = os.environ.get("GEMINI_API_KEY")
+# Railway automatically sets the PORT environment variable.
+# We default to 7860 if running locally.
+PORT = int(os.environ.get("PORT", 7860))
 
 class SceneCuts(BaseModel):
     cut_timestamps_seconds: list[int]
@@ -18,10 +22,16 @@ def process_video(url):
 
     # 1. Download Video
     video_filename = "input_video.mp4"
+    # Clean up previous run
+    if os.path.exists(video_filename):
+        os.remove(video_filename)
+        
     ydl_opts = {
         'outtmpl': video_filename,
         'format': 'mp4',
-        'quiet': True
+        'quiet': True,
+        # Force overwrite
+        'overwrites': True 
     }
     
     try:
@@ -37,7 +47,7 @@ def process_video(url):
         
         # Poll until processing completes
         while video_file.state == "PROCESSING":
-            time.sleep(3)
+            time.sleep(2)
             video_file = client.files.get(name=video_file.name)
             
         if video_file.state == "FAILED":
@@ -61,7 +71,11 @@ def process_video(url):
             },
         )
         
-        client.files.delete(name=video_file.name)
+        # Clean up file from Google Cloud
+        try:
+            client.files.delete(name=video_file.name)
+        except:
+            pass
         
         # 4. Extract Timestamps
         cut_data = json.loads(response.text)
@@ -74,7 +88,12 @@ def process_video(url):
         clips = []
         start_time = 0
         
-        # Ensure the last clip goes to the end of the video
+        # Ensure output directory exists and is clean
+        for f in os.listdir():
+            if f.startswith("clip_") and f.endswith(".mp4"):
+                os.remove(f)
+
+        # Append "end" to handle the last segment
         timestamps.append("end") 
 
         for i, end_time in enumerate(timestamps):
@@ -89,12 +108,12 @@ def process_video(url):
             subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             start_time = end_time
 
-        return clips, "Success! Video split into scenes."
+        return clips, f"Success! Video split into {len(clips)} scenes."
 
     except Exception as e:
         return None, f"Processing error: {str(e)}"
 
-# Gradio Interface
+# --- Gradio Interface ---
 demo = gr.Interface(
     fn=process_video,
     inputs=gr.Textbox(label="Paste Video URL (YouTube/Vimeo)"),
@@ -102,8 +121,15 @@ demo = gr.Interface(
         gr.File(label="Download Generated Clips", file_count="multiple"),
         gr.Textbox(label="Status Logs")
     ],
-    title="AI Scene Detector & Video Clipper"
+    title="AI Scene Detector & Video Clipper",
+    description="Powered by Gemini 2.5 Flash & FFmpeg"
 )
 
+# --- Launch Server ---
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 8080)))
+    print(f"Starting Gradio on port {PORT}...")
+    demo.launch(
+        server_name="0.0.0.0", 
+        server_port=PORT,
+        allowed_paths=["/"]
+    )
