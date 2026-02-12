@@ -1,0 +1,4 @@
+gradio==4.19.2
+google-genai==0.3.0
+yt-dlp==2023.12.30
+pydantic==2.6.1
