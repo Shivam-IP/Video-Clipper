@@ -1,5 +1,5 @@
 gradio>=5.0.0
 google-genai
-yt-dlp
 pydantic
 ffmpeg-python
+yt-dlp @ git+https://github.com/yt-dlp/yt-dlp.git@master
