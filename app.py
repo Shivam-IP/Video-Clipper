@@ -112,7 +112,7 @@ def process_video(url_input, file_input):
 
 # --- UI ---
 with gr.Blocks(title="AI Video Clipper") as demo:
-    gr.Markdown("# 🎬 Pro AI Video Scene Splitter")
+    gr.Markdown("# 🎬 AI Video Scene Splitter")
     with gr.Tabs():
         with gr.TabItem("🔗 URL"):
             url_box = gr.Textbox(label="YouTube Link")
